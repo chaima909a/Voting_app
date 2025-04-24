@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>🎉 Résultats - Élections du Chef de Master</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
+  <script defer src="app.js"></script> <!-- Ton script principal -->
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(120deg, #f3e5f5, #fff);
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: #333;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #6a1b9a;
+      margin-bottom: 1rem;
+    }
+
+    #winner {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #388e3c;
+      margin-top: 1rem;
+    }
+
+    .back-link {
+      margin-top: 2rem;
+      padding: 0.7rem 1.5rem;
+      background-color: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .back-link:hover {
+      background-color: #0d47a1;
+    }
+
+    .button {
+      margin-top: 2rem;
+      padding: 0.7rem 1.5rem;
+      background-color: #388e3c;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .button:hover {
+      background-color: #2c6b2f;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🎉 Félicitations au Gagnant !</h1>
+  <p>Le chef du master élu est :</p>
+  <div id="winner">Chargement...</div>
+
+  <!-- Ajouter le bouton pour voir les résultats -->
+  <button class="button" onclick="getWinner()">Voir les résultats</button>
+
+  <a href="index.html" class="back-link">⬅ Retour</a>
+
+  <script>
+    async function getWinner() {
+      // Vérification que l'élément 'winner' est présent dans le DOM
+      const winnerElement = document.getElementById("winner");
+      if (!winnerElement) {
+        console.error("Élément 'winner' introuvable.");
+        return;
+      }
+
+      // Vérification si MetaMask est installé
+      if (typeof window.ethereum !== 'undefined') {
+        const web3 = new Web3(window.ethereum);
+
+        try {
+          // Demander à MetaMask de se connecter
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+          // Adresse du contrat déployé et ABI
+          const contractAddress = "0x6d77b4653b0BC71b01e9D8EBa7d9BB1026279D69";
+          const contractABI = [
+            {
+              "inputs": [{"internalType": "string[]", "name": "_candidateNames", "type": "string[]"}],
+              "stateMutability": "nonpayable",
+              "type": "constructor"
+            },
+            {
+              "inputs": [],
+              "name": "admin",
+              "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+              "stateMutability": "view",
+              "type": "function",
+              "constant": true
+            },
+            {
+              "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+              "name": "candidates",
+              "outputs": [
+                {"internalType": "string", "name": "name", "type": "string"},
+                {"internalType": "uint256", "name": "voteCount", "type": "uint256"}
+              ],
+              "stateMutability": "view",
+              "type": "function",
+              "constant": true
+            },
+            {
+              "inputs": [{"internalType": "address", "name": "", "type": "address"}],
+              "name": "hasVoted",
+              "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+              "stateMutability": "view",
+              "type": "function",
+              "constant": true
+            },
+            {
+              "inputs": [{"internalType": "uint256", "name": "candidateIndex", "type": "uint256"}],
+              "name": "vote",
+              "outputs": [],
+              "stateMutability": "nonpayable",
+              "type": "function"
+            },
+            {
+              "inputs": [],
+              "name": "getCandidates",
+              "outputs": [
+                {
+                  "components": [
+                    {"internalType": "string", "name": "name", "type": "string"},
+                    {"internalType": "uint256", "name": "voteCount", "type": "uint256"}
+                  ],
+                  "internalType": "struct Voting.Candidate[]",
+                  "name": "",
+                  "type": "tuple[]"
+                }
+              ],
+              "stateMutability": "view",
+              "type": "function",
+              "constant": true
+            }
+          ];
+
+          // Créer l'instance du contrat
+          const contract = new web3.eth.Contract(contractABI, contractAddress);
+
+          try {
+            // Appel pour récupérer l'index du gagnant
+            const winnerIndex = await contract.methods.getWinner().call();
+            const candidate = await contract.methods.candidates(winnerIndex).call();
+
+            // Affichage du gagnant
+            winnerElement.innerText = candidate.name;
+          } catch (error) {
+            winnerElement.innerText = "Erreur lors du chargement des résultats.";
+            console.error("Erreur lors de l'appel du contrat :", error);
+          }
+        } catch (error) {
+          winnerElement.innerText = "Veuillez installer MetaMask.";
+          console.error("Erreur de connexion avec MetaMask :", error);
+        }
+      } else {
+        winnerElement.innerText = "Veuillez installer MetaMask.";
+      }
+    }
+
+    // Appeler la fonction après le chargement complet de la page
+    document.addEventListener("DOMContentLoaded", getWinner);
+  </script>
+</body>
+</html>
