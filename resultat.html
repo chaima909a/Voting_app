@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Résultats de l'Élection</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.6.0/dist/web3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script src="app.js" defer></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f7fc;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      color: #4CAF50;
+      font-size: 2.5rem;
+      margin-bottom: 30px;
+    }
+    #winner {
+      font-size: 1.8rem;
+      margin-top: 50px;
+      font-weight: bold;
+      color: #4CAF50;
+      opacity: 0;
+      animation: fadeIn 2s forwards, zoomIn 1s forwards, bounce 1s ease infinite;
+      display: inline-block;
+      margin-top: 10px;
+    }
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    @keyframes zoomIn {
+      from {
+        transform: scale(0.5);
+      }
+      to {
+        transform: scale(1);
+      }
+    }
+    @keyframes bounce {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-20px);
+      }
+    }
+    .trophy-icon {
+      font-size: 3rem;
+      color: gold;
+      margin-right: 10px;
+      animation: rotateIcon 2s linear infinite;
+    }
+    @keyframes rotateIcon {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+    #results {
+      list-style-type: none;
+      padding: 0;
+      margin-top: 30px;
+      display: none;
+      width: 100%;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: left;
+    }
+    #results li {
+      background-color: #fff;
+      margin: 10px 0;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      font-size: 1.2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #results li .vote-count {
+      font-weight: bold;
+    }
+    .loading {
+      color: #ffa500;
+      font-size: 1.5rem;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      margin-top: 20px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #toggle-button {
+      margin-top: 20px;
+    }
+    .button-container {
+      margin-top: 50px;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+</head>
+<body>
+
+  <h1>Résultats de l'Élection</h1>
+
+  <div id="loading" class="loading">Chargement des résultats...</div>
+  
+  <div id="winner">
+    <span class="trophy-icon"><i class="fas fa-trophy"></i></span>
+    Le gagnant est : Chargement...
+  </div>
+
+  <div class="button-container">
+    <button id="toggle-button" onclick="toggleResults()">Afficher les résultats</button>
+    <button onclick="goBack()">Retour à l'index</button>
+  </div>
+
+  <ul id="results"></ul>
+
+  <script>
+    let web3;
+    let contract;
+    let accounts;
+
+    const contractAddress = "0x40d7676cA16Cc46Fb20ed3B4eDc9B9B8D5DCCfe0"; 
+    const contractABI = [
+  {
+    "inputs": [
+      {
+        "internalType": "string[]",
+        "name": "_candidateNames",
+        "type": "string[]"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "admin",
+    "outputs": [
+      { "internalType": "address", "name": "", "type": "address" }
+    ],
+    "stateMutability": "view",
+    "type": "function",
+    "constant": true
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "name": "candidates",
+    "outputs": [
+      { "internalType": "string", "name": "name", "type": "string" },
+      { "internalType": "uint256", "name": "voteCount", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function",
+    "constant": true
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "name": "hasVotedByAddress",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function",
+    "constant": true
+  },
+  {
+    "inputs": [],
+    "name": "getCandidates",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "string", "name": "name", "type": "string" },
+          { "internalType": "uint256", "name": "voteCount", "type": "uint256" }
+        ],
+        "internalType": "struct Voting.Candidate[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function",
+    "constant": true
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "candidateIndex", "type": "uint256" }],
+    "name": "vote",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getWinner",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function",
+    "constant": true
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "voter", "type": "address" }],
+    "name": "hasVoted",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function",
+    "constant": true
+  },
+  {
+    "inputs": [],
+    "name": "getAdmin",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function",
+    "constant": true
+  }
+];
+
+    window.addEventListener('load', async () => {
+      if (typeof window.ethereum !== 'undefined') {
+        try {
+          console.log("MetaMask est détecté.");
+          web3 = new Web3(window.ethereum);
+          accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+          contract = new web3.eth.Contract(contractABI, contractAddress);
+          await loadCandidates();
+        } catch (error) {
+          console.error("Erreur lors de la connexion MetaMask :", error);
+          document.getElementById("loading").innerText = "Erreur lors de la connexion MetaMask.";
+        }
+      } else {
+        alert("Veuillez installer MetaMask pour utiliser cette application.");
+        document.getElementById("loading").innerText = "MetaMask non détecté.";
+      }
+    });
+
+    async function loadCandidates() {
+      const loadingText = document.getElementById("loading");
+      const select = document.getElementById("results");
+      const winnerElement = document.getElementById("winner");
+      loadingText.innerText = "Chargement des candidats...";
+
+      try {
+        const candidates = await contract.methods.getCandidates().call();
+        select.innerHTML = "";
+
+        if (candidates.length > 0) {
+          let winner = candidates[0];
+          candidates.forEach((candidate) => {
+            const li = document.createElement("li");
+            li.innerHTML = `${candidate.name} <span class="vote-count">${candidate.voteCount} votes</span>`;
+            select.appendChild(li);
+            
+            if (candidate.voteCount > winner.voteCount) {
+              winner = candidate;
+            }
+          });
+
+          winnerElement.innerHTML = ` 
+            <span class="trophy-icon"><i class="fas fa-trophy"></i></span>
+            Le gagnant est : ${winner.name} avec ${winner.voteCount} votes`;
+
+          confetti({
+            particleCount: 150,
+            spread: 180,
+            origin: { x: 0.5, y: 0.5 }
+          });
+
+          loadingText.innerText = "";
+        } else {
+          select.innerHTML = "<li>Aucun candidat disponible</li>";
+          loadingText.innerText = "Aucun candidat disponible.";
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des candidats :", error);
+        loadingText.innerText = "Erreur lors du chargement des candidats.";
+      }
+    }
+
+    function toggleResults() {
+      const resultsList = document.getElementById("results");
+      const toggleButton = document.getElementById("toggle-button");
+
+      if (resultsList.style.display === "none" || resultsList.style.display === "") {
+        resultsList.style.display = "block";
+        toggleButton.innerText = "Masquer les résultats";
+      } else {
+        resultsList.style.display = "none";
+        toggleButton.innerText = "Afficher les résultats";
+      }
+    }
+
+    function goBack() {
+      window.location.href = "index.html";
+    }
+  </script>
+</body>
+</html>

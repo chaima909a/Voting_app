@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>🗳️ Élections - Vote en ligne</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
+  <script defer src="app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* --- styles inchangés, ils étaient déjà très bons --- */
+    /* (ton CSS est propre, je n'ai fait que corriger le loginModal et améliorer les marges sur petits détails) */
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Rubik', sans-serif;
+      background: linear-gradient(135deg, #4CAF50, #ffffff);
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: #333;
+    }
+    .container {
+      background: #ffffff;
+      padding: 2.5rem 2rem;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 550px;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      animation: fadeIn 1s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    h1 {
+      font-size: 2rem;
+      color: #4CAF50;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    label { font-weight: 500; color: #333; }
+    select, button {
+      padding: 0.6rem 1rem;
+      font-size: 1rem;
+      border: 1px solid #4CAF50;
+      border-radius: 8px;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    select:focus, button:focus {
+      border-color: #388E3C;
+      box-shadow: 0 0 10px rgba(56, 142, 60, 0.4);
+    }
+    button {
+      background-color: #4CAF50;
+      color: #fff;
+      border: 1px solid #4CAF50;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+    button:hover {
+      background-color: #388E3C;
+      transform: scale(1.05);
+    }
+    button:disabled {
+      background-color: #b0bec5;
+      cursor: not-allowed;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    @media (min-width: 480px) {
+      .btn-group {
+        flex-direction: row;
+        justify-content: space-between;
+      }
+    }
+    #loading {
+      color: #757575;
+      font-style: italic;
+      text-align: center;
+    }
+    .footer-note {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 1rem;
+    }
+    /* Modal */
+    #loginModal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      align-items: center;
+      justify-content: center;
+      display: none;
+    }
+    #loginModal div {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      min-width: 300px;
+    }
+    #loginModal input, #loginModal button {
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+    #loginModal p {
+      color: red;
+      font-size: 0.9rem;
+      display: none;
+    }
+    #intro button {
+      margin: 0 auto;
+      display: block;
+    }
+    #voteSection button {
+      flex: 1;
+      min-width: 100px;
+      margin-bottom: 1rem;
+    }
+    #voteSection select {
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>🗳️ Bienvenue aux élections annuelles de la classe</h1>
+  
+    <div id="intro">
+      <p>Les élections pour élire le chef de master se déroulent aujourd'hui. Choisissez votre candidat préféré et votez en ligne.</p>
+      <button onclick="startVoting()">Commencer</button>
+    </div>
+  
+    <div id="voteSection" style="display:none;">
+      <p id="loading">Chargement des candidats...</p>
+      <label for="candidates">Choisissez un candidat :</label>
+      <select id="candidates" onchange="enableVoteButton()">
+        <option value="" disabled selected>-- Sélectionner --</option>
+        <option value="marien">Marien</option>
+        <option value="candidat2">Candidat 2</option>
+        <option value="candidat3">Candidat 3</option>
+      </select>
+
+      <div class="btn-group">
+        <button id="voteButton" onclick="vote()" disabled>✅ Voter</button>
+        <button onclick="showLogin()">📊 Résultats</button>
+        <button onclick="connectWallet()">🔌 Se connecter</button>
+      </div>
+
+      <ul id="results" style="display: none;"></ul>
+    </div>
+
+    <div class="footer-note">Université de Kairouan - Département Informatique</div>
+  </div>
+
+<!-- Modal admin -->
+<div id="loginModal" style="display: none;">
+  <div style="background-color:#fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); max-width: 400px; margin: 0 auto; text-align: center;">
+    <h3 style="color:#4CAF50; margin-bottom: 20px;">Authentification Admin</h3>
+
+    <input type="text" id="adminUser" placeholder="Nom d'utilisateur" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px;" required>
+    <input type="password" id="adminPass" placeholder="Mot de passe" style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px;" required>
+    
+    <button onclick="loginAdmin()" style="background-color:#4CAF50; color:white; padding: 10px 20px; border: none; border-radius: 5px; width: 100%; cursor: pointer;">Connexion</button>
+    <button onclick="closeLoginModal()" style="background-color:#b0bec5; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; cursor: pointer;">Fermer</button>
+    
+    <p id="loginError" style="color: red; display: none; margin-top: 10px;">Identifiants incorrects</p>
+  </div>
+</div>
+
+  <script>
+    let adminLoggedIn = false;
+
+    function startVoting() {
+      document.getElementById("intro").style.display = "none";
+      document.getElementById("voteSection").style.display = "block";
+      document.getElementById("loading").style.display = "none"; // Cache "Chargement des candidats..."
+    }
+
+    function enableVoteButton() {
+      document.getElementById("voteButton").disabled = false;
+    }
+
+    function showLogin() {
+      document.getElementById("loginModal").style.display = "flex";
+    }
+
+    function closeLoginModal() {
+      document.getElementById("loginModal").style.display = "none";
+    }
+
+    function loginAdmin() {
+      const user = document.getElementById("adminUser").value;
+      const pass = document.getElementById("adminPass").value;
+
+      if (user === "admin" && pass === "021002") {
+        adminLoggedIn = true;
+        window.location.href = "resultat.html"; 
+      } else {
+        document.getElementById("loginError").style.display = "block";
+      }
+    }
+
+    async function connectWallet() {
+      if (typeof window.ethereum !== 'undefined' && typeof window.web3 !== 'undefined') {
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          alert("🔌 Connecté avec le portefeuille : " + accounts[0]);
+        } catch (error) {
+          alert("❌ Erreur lors de la connexion au portefeuille.");
+        }
+      } else {
+        alert("🦊 Veuillez installer MetaMask pour utiliser cette fonctionnalité.");
+      }
+    }
+
+    function vote() {
+      alert("✅ Votre vote a été enregistré !");
+    }
+  </script>
+</body>
+</html>
